@@ -25,6 +25,7 @@ model User {
   notes       Note[]
   flashcards  Flashcard[]
   quizzes     Quiz[]
+  quizAttempts QuizAttempt[]
   files       File[]
   studySessions StudySession[]
 
