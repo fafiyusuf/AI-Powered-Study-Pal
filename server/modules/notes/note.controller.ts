@@ -1,20 +1,20 @@
-import { Request, Response, NextFunction } from "express";
-import {
-  createNote,
-  getAllNotes,
-  getNoteById,
-  updateNote,
-  deleteNote,
-  importNotes,
-  searchNotes,
-} from "./note.service";
+import { NextFunction, Request, Response } from "express";
 import { CustomError } from "../../utils/customError";
+import {
+    createNote,
+    deleteNote,
+    getAllNotes,
+    getNoteById,
+    importNotes,
+    searchNotes,
+    updateNote,
+} from "./note.service";
 
 export const getNotes = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req as any).user.id;
     const notes = await getAllNotes(userId);
-    res.status(200).json({ success: true, notes });
+    res.status(200).json({ success: true, data: notes });
   } catch (err) {
     next(err);
   }
@@ -24,7 +24,7 @@ export const getNote = async (req: Request, res: Response, next: NextFunction) =
   try {
     const note = await getNoteById(req.params.id);
     if (!note) throw new CustomError("Note not found", 404);
-    res.status(200).json({ success: true, note });
+    res.status(200).json({ success: true, data: note });
   } catch (err) {
     next(err);
   }
@@ -37,7 +37,7 @@ export const createNewNote = async (req: Request, res: Response, next: NextFunct
     if (!title || !content) throw new CustomError("Title and content are required", 400);
 
     const note = await createNote({ title, content, tags, userId });
-    res.status(201).json({ success: true, note });
+    res.status(201).json({ success: true, data: note });
   } catch (err) {
     next(err);
   }
@@ -46,7 +46,7 @@ export const createNewNote = async (req: Request, res: Response, next: NextFunct
 export const updateExistingNote = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const note = await updateNote(req.params.id, req.body);
-    res.status(200).json({ success: true, note });
+    res.status(200).json({ success: true, data: note });
   } catch (err) {
     next(err);
   }
@@ -68,7 +68,7 @@ export const importNotesFromFile = async (req: Request, res: Response, next: Nex
     if (!Array.isArray(notesData)) throw new CustomError("Invalid notes data format", 400);
 
     const imported = await importNotes(notesData, userId);
-    res.status(201).json({ success: true, imported });
+    res.status(201).json({ success: true, data: imported });
   } catch (err) {
     next(err);
   }
@@ -81,7 +81,7 @@ export const searchUserNotes = async (req: Request, res: Response, next: NextFun
     if (!q) throw new CustomError("Search query is required", 400);
 
     const results = await searchNotes(q as string, userId);
-    res.status(200).json({ success: true, results });
+    res.status(200).json({ success: true, data: results });
   } catch (err) {
     next(err);
   }

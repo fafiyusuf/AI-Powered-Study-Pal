@@ -1,4 +1,4 @@
-import { mockNotes, mockQuizzes } from "@/mockData/index"
+// Dashboard relies on real backend-loaded data. Quizzes default empty until API is implemented.
 import type { ChatMessage, Flashcard, Note, Quiz, QuizResult, User } from "@/types/index"
 import { create } from "zustand"
 import type { AppState } from "./types"
@@ -35,9 +35,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoading: false,
 
   // Study state
-  notes: mockNotes,
+  notes: [],
   flashcards: [],
-  quizzes: mockQuizzes,
+  quizzes: [],
   chatHistory: [],
   quizResults: [],
 
@@ -104,12 +104,22 @@ export const useAppStore = create<AppState>((set, get) => ({
  // --- Note actions ---
 addNote: async (noteData: { title: string; content: string; subject: string }) => {
   try {
-    const res = await api<{ success: boolean; data: Note }>("/api/notes", {
+    const res = await api<{ success: boolean; data: any }>("/api/notes", {
       method: "POST",
-      body: JSON.stringify(noteData),
+      body: JSON.stringify({ title: noteData.title, content: noteData.content, tags: [noteData.subject] }),
     })
+    const n = res.data
+    const mapped: Note = {
+      id: n.id,
+      title: n.title,
+      content: n.content,
+      subject: (n.tags && n.tags[0]) || noteData.subject || 'General',
+      createdAt: new Date(n.createdAt),
+      updatedAt: new Date(n.updatedAt),
+      userId: n.userId,
+    }
     set((state) => ({
-      notes: [res.data, ...state.notes],
+      notes: [mapped, ...state.notes],
     }))
   } catch (err) {
     console.error("Failed to add note:", err)
@@ -118,12 +128,27 @@ addNote: async (noteData: { title: string; content: string; subject: string }) =
 
 updateNote: async (id: string, updates: Partial<Note>) => {
   try {
-    const res = await api<{ success: boolean; data: Note }>(`/api/notes/${id}`, {
+    const payload: any = { ...updates }
+    if (typeof updates.subject === 'string') {
+      payload.tags = [updates.subject]
+      delete payload.subject
+    }
+    const res = await api<{ success: boolean; data: any }>(`/api/notes/${id}`, {
       method: "PATCH",
-      body: JSON.stringify(updates),
+      body: JSON.stringify(payload),
     })
+    const n = res.data
+    const mapped: Note = {
+      id: n.id,
+      title: n.title,
+      content: n.content,
+      subject: (n.tags && n.tags[0]) || updates.subject || 'General',
+      createdAt: new Date(n.createdAt),
+      updatedAt: new Date(n.updatedAt),
+      userId: n.userId,
+    }
     set((state) => ({
-      notes: state.notes.map((note) => (note.id === id ? res.data : note)),
+      notes: state.notes.map((note) => (note.id === id ? mapped : note)),
     }))
   } catch (err) {
     console.error("Failed to update note:", err)
@@ -147,14 +172,24 @@ getNotesBySubject: (subject: string) => {
   )
 },
 
-loadNotes: async () => {
-  try {
-    const res = await api<{ success: boolean; data: Note[] }>("/api/notes")
-    set({ notes: res.data })
-  } catch (err) {
-    console.error("Failed to load notes:", err)
-  }
-},
+  loadNotes: async () => {
+    try {
+      const res = await api<{ success: boolean; data: Note[] }>("/api/notes")
+      // API returns dates as strings; convert to Date objects for consistency
+      const notes = (res.data || []).map((n: any) => ({
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        subject: (n.tags && n.tags[0]) || 'General',
+        createdAt: new Date(n.createdAt),
+        updatedAt: new Date(n.updatedAt),
+        userId: n.userId,
+      }))
+      set({ notes })
+    } catch (err) {
+      console.error("Failed to load notes:", err)
+    }
+  },
 
 
   // Flashcard actions
@@ -288,11 +323,24 @@ loadNotes: async () => {
         ? Math.round(results.reduce((sum, r) => sum + (r.score / r.totalQuestions) * 100, 0) / results.length)
         : 0
 
+    // Compute streak: consecutive days (backwards) with at least one note or flashcard
+    const activityDates = new Set<string>([
+      ...state.notes.map((n) => new Date(n.createdAt).toDateString()),
+      ...state.flashcards.map((f) => new Date(f.createdAt).toDateString()),
+    ])
+    let streak = 0
+    for (let i = 0; i < 30; i++) { // look back up to 30 days
+      const day = new Date()
+      day.setDate(day.getDate() - i)
+      if (activityDates.has(day.toDateString())) streak++
+      else break
+    }
+
     return {
       totalNotes: state.notes.length,
       totalFlashcards: state.flashcards.length,
       totalQuizzes: state.quizzes.length,
-      studyStreak: 7,
+      studyStreak: streak,
       averageScore,
       recentSessions: [],
     }

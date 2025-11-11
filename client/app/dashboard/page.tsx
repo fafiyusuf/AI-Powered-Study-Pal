@@ -4,31 +4,78 @@ import { ProtectedLayout } from "@/components/protected-layout"
 import { StatsCard } from "@/components/stats-card"
 import { useAppStore } from "@/store/useAppStore"
 import Link from "next/link"
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 export default function DashboardPage() {
   const notes = useAppStore((state) => state.notes)
   const flashcards = useAppStore((state) => state.flashcards)
   const quizzes = useAppStore((state) => state.quizzes)
   const quizResults = useAppStore((state) => state.quizResults)
+  const loadNotes = useAppStore((s) => s.loadNotes)
+  const loadFlashcards = useAppStore((s) => s.loadFlashcards)
+  const getStudyStats = useAppStore((s) => s.getStudyStats)
+  const isLoggedIn = useAppStore((s) => s.isLoggedIn)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const stats = useMemo(() => {
-    const averageScore =
-      quizResults.length > 0
-        ? Math.round(quizResults.reduce((sum, r) => sum + (r.score / r.totalQuestions) * 100, 0) / quizResults.length)
-        : 0
-
-    return {
-      totalNotes: notes.length,
-      totalFlashcards: flashcards.length,
-      totalQuizzes: quizzes.length,
-      studyStreak: 7,
-      averageScore,
+  useEffect(() => {
+    let active = true
+    const run = async () => {
+      try {
+        if (!isLoggedIn) return
+        await Promise.all([loadNotes(), loadFlashcards()])
+      } catch (e: any) {
+        if (active) setError(e.message || 'Failed to load data')
+      } finally {
+        if (active) setLoading(false)
+      }
     }
-  }, [notes.length, flashcards.length, quizzes.length, quizResults])
+    run()
+    return () => {
+      active = false
+    }
+  }, [loadNotes, loadFlashcards, isLoggedIn])
 
-  const recentNotes = notes.slice(-3).reverse()
-  const recentFlashcards = flashcards.slice(-3).reverse()
+  const stats = useMemo(() => getStudyStats(), [notes, flashcards, quizzes, quizResults, getStudyStats])
+
+  const recentNotes = notes.slice(0, 3)
+  const recentFlashcards = flashcards.slice(0, 3)
+
+  if (loading) {
+    return (
+      <ProtectedLayout>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <h1 className="text-2xl font-semibold text-white mb-4">Loading dashboard...</h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-32 rounded-lg bg-slate-800 animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </ProtectedLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <ProtectedLayout>
+        <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+          <h1 className="text-2xl font-semibold text-white mb-2">Dashboard</h1>
+          <p className="text-red-400 mb-4">{error}</p>
+          <button
+            onClick={() => {
+              setLoading(true)
+              setError(null)
+              Promise.all([loadNotes(), loadFlashcards()])
+                .catch((e) => setError(e.message || 'Failed again'))
+                .finally(() => setLoading(false))
+            }}
+            className="px-4 py-2 bg-indigo-600 rounded text-white hover:bg-indigo-500"
+          >Retry</button>
+        </div>
+      </ProtectedLayout>
+    )
+  }
 
   return (
     <ProtectedLayout>
@@ -45,10 +92,10 @@ export default function DashboardPage() {
           <StatsCard title="Quizzes" value={stats.totalQuizzes} icon="✅" color="amber" />
           <StatsCard
             title="Study Streak"
-            value={`${stats.studyStreak} days`}
+            value={`${stats.studyStreak} day${stats.studyStreak === 1 ? '' : 's'}`}
             icon="🔥"
             color="blue"
-            trend="Keep it up!"
+            trend={stats.studyStreak > 0 ? 'Keep it up!' : 'Start studying today'}
           />
         </div>
 
@@ -63,7 +110,7 @@ export default function DashboardPage() {
               </div>
               <div className="w-full bg-slate-700 rounded-full h-3">
                 <div
-                  className="bg-gradient-to-r from-indigo-500 to-indigo-400 h-3 rounded-full"
+                  className="bg-linear-to-r from-indigo-500 to-indigo-400 h-3 rounded-full"
                   style={{ width: `${stats.averageScore}%` }}
                 />
               </div>
@@ -121,7 +168,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Study Tips */}
-        <div className="bg-gradient-to-r from-indigo-600/20 to-purple-600/20 border border-indigo-500/20 rounded-lg p-6">
+  <div className="bg-linear-to-r from-indigo-600/20 to-purple-600/20 border border-indigo-500/20 rounded-lg p-6">
           <h2 className="text-lg font-semibold text-white mb-3">Study Tips</h2>
           <ul className="space-y-2 text-slate-300 text-sm">
             <li className="flex items-start gap-2">

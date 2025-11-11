@@ -1,25 +1,27 @@
 import express from "express";
+import { protect } from "../auth/auth.middleware";
 import {
-  getNotes,
-  getNote,
   createNewNote,
-  updateExistingNote,
   deleteExistingNote,
+  getNote,
+  getNotes,
   importNotesFromFile,
   searchUserNotes,
+  updateExistingNote,
 } from "./note.controller";
-//import { protect } from "../auth/auth.middleware";
 
 const router = express.Router();
 
-//router.use(protect); 
+// Protect all notes routes to ensure req.user is available in controllers
+router.use(protect);
 
+// Order matters: static paths before dynamic ":id" to avoid conflicts
 router.get("/", getNotes);
 router.post("/", createNewNote);
+router.get("/search", searchUserNotes);
+router.post("/import", importNotesFromFile);
 router.get("/:id", getNote);
 router.patch("/:id", updateExistingNote);
 router.delete("/:id", deleteExistingNote);
-router.post("/import", importNotesFromFile);
-router.get("/search", searchUserNotes);
 
 export default router;
