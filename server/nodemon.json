@@ -1,0 +1,9 @@
+{
+  "watch": ["src", "modules", "middlewares", "utils", "app.ts", "server.ts", "prisma", "config"],
+  "extensions": "ts,js,json",
+  "exec": "node dist/server.js",
+  "ignore": ["dist", "node_modules"],
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

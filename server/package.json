@@ -6,7 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
     "start": "npm run build && node dist/server.js",
-    "dev": "npx prisma db push && concurrently -k \"tsc -w\" \"nodemon dist/server.js\""
+    "dev": "concurrently -k \"tsc -w\" \"nodemon\""
   },
   "keywords": [],
   "author": "",
@@ -14,6 +14,7 @@
   "description": "",
   "dependencies": {
     "@google/genai": "^1.29.0",
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.14.0",
     "@types/express": "^5.0.3",
     "@types/multer": "^2.0.0",
@@ -28,6 +29,7 @@
     "mongodb": "^6.17.0",
     "mongoose": "^8.16.4",
     "multer": "^2.0.2",
+    "pdf-parse": "^2.4.5",
     "prisma": "^6.14.0",
     "sharp": "^0.34.5"
   },

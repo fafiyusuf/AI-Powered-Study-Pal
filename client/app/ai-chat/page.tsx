@@ -5,7 +5,7 @@ import type React from "react"
 import { ChatMessage } from "@/components/chat-message"
 import { ProtectedLayout } from "@/components/protected-layout"
 import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer"
-import { generateFlashcardsFromText, generateMockAIResponse, generateStudyNotesFromText, summarizePdf } from "@/services/ai"
+import { generateFlashcardsFromText, generateStudyNotesFromText, sendChat, summarizePdf } from "@/services/ai"
 import { useAppStore } from "@/store/useAppStore"
 import type { ChatMessage as ChatMessageType } from "@/types/index"
 import { useEffect, useRef, useState } from "react"
@@ -15,7 +15,6 @@ export default function AIChatPage() {
   const addChatMessage = useAppStore((state) => state.addChatMessage)
   const clearChatHistory = useAppStore((state) => state.clearChatHistory)
   const addNote = useAppStore((state) => state.addNote)
-  const addFlashcard = useAppStore((state) => state.addFlashcard)
   const user = useAppStore((state) => state.user)
 
   const [input, setInput] = useState("")
@@ -27,6 +26,7 @@ export default function AIChatPage() {
   const [generatingFlashcards, setGeneratingFlashcards] = useState(false)
   const [generatingNotes, setGeneratingNotes] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -37,32 +37,36 @@ export default function AIChatPage() {
     e.preventDefault()
     if (!input.trim() || isLoading) return
 
-    // Add user message
     const userMessage: ChatMessageType = {
       id: Math.random().toString(36).substr(2, 9),
       content: input,
-      role: "user",
+      role: 'user',
       timestamp: new Date(),
     }
-
     addChatMessage(userMessage)
     setInput("")
     setIsLoading(true)
-
     try {
-      // Generate AI response
-      const aiResponse = await generateMockAIResponse(input)
-
+      const aiReply = await sendChat([
+        ...chatHistory.map(m => ({ role: m.role, content: m.content })),
+        { role: 'user', content: userMessage.content }
+      ])
       const assistantMessage: ChatMessageType = {
         id: Math.random().toString(36).substr(2, 9),
-        content: aiResponse,
-        role: "assistant",
+        content: aiReply || 'No response',
+        role: 'assistant',
         timestamp: new Date(),
       }
-
       addChatMessage(assistantMessage)
     } catch (error) {
-      console.error("Error generating response:", error)
+      console.error('Error generating response:', error)
+      const assistantMessage: ChatMessageType = {
+        id: Math.random().toString(36).substr(2, 9),
+        content: 'AI request failed.',
+        role: 'assistant',
+        timestamp: new Date(),
+      }
+      addChatMessage(assistantMessage)
     } finally {
       setIsLoading(false)
     }
@@ -81,6 +85,19 @@ export default function AIChatPage() {
     }
   }
 
+  const clearSelectedFile = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
+    }
+    setPreviewUrl(null)
+    setSelectedFile(null)
+    setPreviewOpen(false)
+    // Reset file input so the same file can be re-selected
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
   const handleSummarizePdf = async () => {
     if (!selectedFile || isSummarizing) return
     setIsSummarizing(true)
@@ -95,7 +112,7 @@ export default function AIChatPage() {
       }
       addChatMessage(assistantMessage)
       // Clear selection after summarization
-      setSelectedFile(null)
+      clearSelectedFile()
     } catch (error) {
       console.error("Error summarizing PDF:", error)
       const assistantMessage: ChatMessageType = {
@@ -135,18 +152,11 @@ export default function AIChatPage() {
     setGeneratingFlashcards(true)
     try {
       const cards = await generateFlashcardsFromText({ sourceText: content, subject: 'AI Summary', count: 6 })
-      // Add to store
-      cards.forEach((c) => {
-        addFlashcard({
-          id: Math.random().toString(36).substr(2, 9),
-          front: c.front,
-          back: c.back,
-          subject: c.subject,
-          difficulty: c.difficulty,
-          createdAt: new Date(),
-          userId: user?.id || 'anon',
-        })
-      })
+      // Persist via backend flashcards endpoint if user is authenticated
+      const createRemote = useAppStore.getState().createFlashcardRemote
+      for (const c of cards) {
+        await createRemote(c.front, c.back, c.subject, c.difficulty)
+      }
       addChatMessage({
         id: Math.random().toString(36).substr(2, 9),
         role: 'assistant',
@@ -281,6 +291,7 @@ export default function AIChatPage() {
               accept="application/pdf"
               onChange={handleFileChange}
               disabled={isSummarizing}
+              ref={fileInputRef}
               className="text-sm text-slate-300 file:mr-4 file:py-2 file:px-4 file:border-0 file:rounded file:text-sm file:font-semibold file:bg-slate-600 file:text-white hover:file:bg-slate-500"
             />
             <button
@@ -289,13 +300,18 @@ export default function AIChatPage() {
               disabled={!selectedFile || isSummarizing}
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors"
             >
-              {isSummarizing ? "Summarizing..." : selectedFile ? "Summarize PDF" : "Select PDF"}
+              {isSummarizing ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Summarizing...
+                </span>
+              ) : selectedFile ? "Summarize PDF" : "Select PDF"}
             </button>
             <Drawer open={previewOpen} onOpenChange={setPreviewOpen}>
               <DrawerTrigger asChild>
                 <button
                   type="button"
-                  disabled={!selectedFile}
+                  disabled={!selectedFile || isSummarizing}
                   className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
                 >
                   Preview PDF
@@ -317,8 +333,25 @@ export default function AIChatPage() {
                 </div>
               </DrawerContent>
             </Drawer>
-            {selectedFile && !isSummarizing && (
-              <span className="text-xs text-slate-400 truncate max-w-48">{selectedFile.name}</span>
+            {selectedFile && (
+              <div className="flex items-center gap-2 bg-slate-700/60 border border-slate-600 rounded-full px-3 py-1 max-w-full">
+                <span className="text-xs text-slate-300 truncate" title={selectedFile.name}>
+                  📄 {selectedFile.name}
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  {(selectedFile.size / 1024).toFixed(0)} KB
+                </span>
+                <button
+                  type="button"
+                  onClick={clearSelectedFile}
+                  disabled={isSummarizing}
+                  className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-600 hover:bg-red-600 text-white text-xs disabled:opacity-50"
+                  aria-label="Remove selected file"
+                  title="Remove selected file"
+                >
+                  ×
+                </button>
+              </div>
             )}
           </div>
           <form onSubmit={handleSendMessage} className="flex gap-3">
