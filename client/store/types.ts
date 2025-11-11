@@ -26,6 +26,7 @@ export interface AppState extends AuthState, StudyState {
   updateNote: (id: string, note: Partial<Note>) => void
   deleteNote: (id: string) => void
   getNotesBySubject: (subject: string) => Note[]
+  loadNotes: () => Promise<void> // <-- add this
 
   // Flashcard actions
   addFlashcard: (flashcard: Flashcard) => void

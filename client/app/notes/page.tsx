@@ -1,16 +1,25 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ProtectedLayout } from "@/components/protected-layout"
 import { CreateNoteModal } from "@/components/create-note-modal"
 import { useAppStore } from "@/store/useAppStore"
 
 export default function NotesPage() {
+  // Zustand state & actions
   const notes = useAppStore((state) => state.notes)
   const deleteNote = useAppStore((state) => state.deleteNote)
+  const loadNotes = useAppStore((state) => state.loadNotes)
+
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
 
+  // Load notes on mount
+  useEffect(() => {
+    loadNotes()
+  }, [loadNotes])
+
+  // Unique subjects for filter buttons
   const subjects = Array.from(new Set(notes.map((n) => n.subject)))
   const filteredNotes = selectedSubject ? notes.filter((n) => n.subject === selectedSubject) : notes
 
@@ -41,7 +50,9 @@ export default function NotesPage() {
           <button
             onClick={() => setSelectedSubject(null)}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              selectedSubject === null ? "bg-indigo-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              selectedSubject === null
+                ? "bg-indigo-600 text-white"
+                : "bg-slate-700 text-slate-300 hover:bg-slate-600"
             }`}
           >
             All ({notes.length})
@@ -99,6 +110,7 @@ export default function NotesPage() {
         )}
       </div>
 
+      {/* Create Note Modal */}
       <CreateNoteModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </ProtectedLayout>
   )
