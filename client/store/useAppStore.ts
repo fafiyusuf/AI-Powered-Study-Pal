@@ -101,25 +101,47 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  // Note actions
-  addNote: (note: Note) => {
+ // --- Note actions ---
+addNote: async (noteData: { title: string; content: string; subject: string }) => {
+  try {
+    const res = await api<{ success: boolean; data: Note }>("/api/notes", {
+      method: "POST",
+      body: JSON.stringify(noteData),
+    })
     set((state) => ({
-      notes: [...state.notes, note],
+      notes: [res.data, ...state.notes],
     }))
-  },
+  } catch (err) {
+    console.error("Failed to add note:", err)
+  }
+},
 
-  updateNote: (id: string, updates: Partial<Note>) => {
+updateNote: async (id: string, updates: Partial<Note>) => {
+  try {
+    const res = await api<{ success: boolean; data: Note }>(`/api/notes/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    })
     set((state) => ({
-      notes: state.notes.map((note) => (note.id === id ? { ...note, ...updates, updatedAt: new Date() } : note)),
+      notes: state.notes.map((note) =>
+        note.id === id ? res.data : note
+      ),
     }))
-  },
+  } catch (err) {
+    console.error("Failed to update note:", err)
+  }
+},
 
-  deleteNote: (id: string) => {
-    set((state) => ({
-      notes: state.notes.filter((note) => note.id !== id),
-    }))
-  },
-
+deleteNote: async (id: string) => {
+  const prevNotes = get().notes
+  set({ notes: prevNotes.filter((note) => note.id !== id) }) // optimistic UI
+  try {
+    await api(`/api/notes/${id}`, { method: "DELETE" })
+  } catch (err) {
+    console.error("Failed to delete note:", err)
+    set({ notes: prevNotes }) // rollback if failed
+  }
+},
   getNotesBySubject: (subject: string) => {
     return get().notes.filter((note) => note.subject.toLowerCase() === subject.toLowerCase())
   },
