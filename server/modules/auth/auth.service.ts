@@ -17,7 +17,7 @@ export const registerService = async (name: string, email: string, password: str
       password: hashed,
     },
   });
-   const token = generateToken(user.id.toString());
+   const token = generateToken(user.id.toString(),user.name);
 
   return { user, token };
 };
@@ -31,7 +31,7 @@ export const loginService = async (email: string, password: string) => {
 
   if (!isMatch) throw new CustomError("Invalid password", 401);
 
-  const token = generateToken(user.id.toString());
+ const token = generateToken(user.id.toString(),user.name);
 
   return { user, token };
 };
