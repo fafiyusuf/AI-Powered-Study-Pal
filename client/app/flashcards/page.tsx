@@ -1,23 +1,28 @@
 "use client"
 
-import { useState } from "react"
-import { ProtectedLayout } from "@/components/protected-layout"
 import { CreateFlashcardModal } from "@/components/create-flashcard-modal"
 import { Flashcard } from "@/components/flashcard"
+import { ProtectedLayout } from "@/components/protected-layout"
 import { useAppStore } from "@/store/useAppStore"
+import { useEffect, useState } from "react"
 
 export default function FlashcardsPage() {
   const flashcards = useAppStore((state) => state.flashcards)
-  const deleteFlashcard = useAppStore((state) => state.deleteFlashcard)
+  const loadFlashcards = useAppStore((state) => state.loadFlashcards)
+  const deleteFlashcardRemote = useAppStore((state) => state.deleteFlashcardRemote)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
+
+  useEffect(() => {
+    loadFlashcards()
+  }, [loadFlashcards])
 
   const subjects = Array.from(new Set(flashcards.map((f) => f.subject)))
   const filteredCards = selectedSubject ? flashcards.filter((f) => f.subject === selectedSubject) : flashcards
 
   const handleDelete = (id: string) => {
     if (confirm("Delete this flashcard?")) {
-      deleteFlashcard(id)
+      deleteFlashcardRemote(id)
     }
   }
 

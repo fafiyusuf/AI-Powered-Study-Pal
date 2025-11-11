@@ -2,10 +2,9 @@
 
 import type React from "react"
 
+import { useAppStore } from "@/store/useAppStore"
 import { useState } from "react"
 import { Modal } from "./modal"
-import { useAppStore } from "@/store/useAppStore"
-import type { Flashcard } from "@/types/index"
 
 interface CreateFlashcardModalProps {
   isOpen: boolean
@@ -16,7 +15,7 @@ const subjects = ["React", "TypeScript", "JavaScript", "Calculus", "Biology", "H
 const difficulties = ["easy", "medium", "hard"] as const
 
 export function CreateFlashcardModal({ isOpen, onClose }: CreateFlashcardModalProps) {
-  const addFlashcard = useAppStore((state) => state.addFlashcard)
+  const createFlashcardRemote = useAppStore((state) => state.createFlashcardRemote)
   const user = useAppStore((state) => state.user)
   const [formData, setFormData] = useState({
     front: "",
@@ -30,21 +29,10 @@ export function CreateFlashcardModal({ isOpen, onClose }: CreateFlashcardModalPr
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.front.trim() || !formData.back.trim() || !user) return
-
-    const newCard: Flashcard = {
-      id: Math.random().toString(36).substr(2, 9),
-      front: formData.front,
-      back: formData.back,
-      subject: formData.subject,
-      difficulty: formData.difficulty,
-      createdAt: new Date(),
-      userId: user.id,
-    }
-
-    addFlashcard(newCard)
+    await createFlashcardRemote(formData.front, formData.back, formData.subject, formData.difficulty)
     setFormData({ front: "", back: "", subject: "React", difficulty: "easy" })
     onClose()
   }

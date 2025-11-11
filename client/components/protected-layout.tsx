@@ -1,21 +1,23 @@
 "use client"
 
-import { type ReactNode, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { useAppStore } from "@/store/useAppStore"
+import { useRouter } from "next/navigation"
+import { type ReactNode, useEffect, useState } from "react"
 import { Navigation } from "./navigation"
 
 export function ProtectedLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
   const isLoggedIn = useAppStore((state) => state.isLoggedIn)
+  const hydrate = useAppStore((state) => state.hydrateAuthFromStorage)
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
+    hydrate()
     setIsMounted(true)
     if (!isLoggedIn) {
       router.push("/login")
     }
-  }, [isLoggedIn, router])
+  }, [isLoggedIn, router, hydrate])
 
   if (!isMounted || !isLoggedIn) {
     return null

@@ -1,4 +1,4 @@
-import type { User, Note, Flashcard, Quiz, ChatMessage, QuizResult } from "@/types/index"
+import type { ChatMessage, Flashcard, Note, Quiz, QuizResult, User } from "@/types/index"
 
 export interface AuthState {
   user: User | null
@@ -19,6 +19,7 @@ export interface AppState extends AuthState, StudyState {
   login: (email: string, password: string) => Promise<void>
   signup: (email: string, name: string, password: string) => Promise<void>
   logout: () => void
+  hydrateAuthFromStorage: () => Promise<void>
 
   // Note actions
   addNote: (note: Note) => void
@@ -31,6 +32,9 @@ export interface AppState extends AuthState, StudyState {
   updateFlashcard: (id: string, flashcard: Partial<Flashcard>) => void
   deleteFlashcard: (id: string) => void
   getFlashcardsBySubject: (subject: string) => Flashcard[]
+  loadFlashcards: () => Promise<void>
+  createFlashcardRemote: (front: string, back: string, subject: string, difficulty: Flashcard['difficulty']) => Promise<void>
+  deleteFlashcardRemote: (id: string) => Promise<void>
 
   // Quiz actions
   addQuiz: (quiz: Quiz) => void
