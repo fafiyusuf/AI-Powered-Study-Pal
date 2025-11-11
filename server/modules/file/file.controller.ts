@@ -10,14 +10,8 @@ export const uploadStudyFile = async (req: Request, res: Response, next: NextFun
 
     const savedFile = await saveStudyFile(file as any);
     const fileUrl = savedFile.path;
-    const prompt = `You are an expert study assistant. I will provide you with a study material file. 
-Please read it carefully and summarize the **entire content**. 
-Do not skip any section or concept. 
-Include all key points, definitions, examples, and explanations in a clear and structured way. 
-Write the summary in an easy-to-understand format, keeping the logical flow of the material intact. 
-If the material has multiple sections or slides, summarize **each section/slide separately**.
-`;
-    const aiSummary = await genController(fileUrl, prompt);
+   
+    const aiSummary = await genController(fileUrl);
     const summaryContent = aiSummary?.candidates?.[0]?.content?.parts?.[0].text;
     console.log(summaryContent ?? "AI summary content not available.");
  
