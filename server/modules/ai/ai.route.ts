@@ -23,6 +23,15 @@ const router = express.Router();
 
 router.use(protect);
 
+// Lightweight AI health/config introspection (no upstream call)
+router.get("/health", (req, res) => {
+    const hasKey = Boolean(process.env.GENAI_API_KEY || process.env.GEMINI_API_KEY);
+    // FIX: Set the default to gemini-2.5-flash for both, aligning with ai.service.ts
+    const modelChat = process.env.GEMINI_MODEL_CHAT || "gemini-2.5-flash";
+    const modelReason = process.env.GEMINI_MODEL_REASON || "gemini-2.5-flash";
+    res.json({ ok: true, hasKey, modelChat, modelReason });
+});
+
 router.post("/chat", postChat);
 router.get("/chat/stream", getChatStream);
 router.post("/summarize", upload.single("file"), postSummarize);
@@ -32,4 +41,3 @@ router.post("/generate-quiz", postGenerateQuiz);
 router.post("/explain", postExplain);
 
 export default router;
-

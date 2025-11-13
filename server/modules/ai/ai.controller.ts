@@ -37,6 +37,14 @@ export const getChatStream = async (req: AuthRequest, res: Response, next: NextF
 		res.write("data: {}\n\n");
 		res.end();
 	} catch (err) {
+		// If we've already started an SSE response, emit an error event instead of delegating to JSON error handler
+		if (res.headersSent) {
+			const message = (err as any)?.message || "Chat stream failed";
+			res.write(`event: error\n`);
+			res.write(`data: ${JSON.stringify({ message })}\n\n`);
+			res.end();
+			return;
+		}
 		next(err);
 	}
 };

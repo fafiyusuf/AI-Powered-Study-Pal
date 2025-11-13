@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import type { Quiz, QuizResult } from "@/types/index"
 import { useAppStore } from "@/store/useAppStore"
+import type { Quiz, QuizResult } from "@/types/index"
+import { useState } from "react"
 
 interface QuizPlayerProps {
   quiz: Quiz
@@ -11,6 +11,7 @@ interface QuizPlayerProps {
 
 export function QuizPlayer({ quiz, onComplete }: QuizPlayerProps) {
   const addQuizResult = useAppStore((state) => state.addQuizResult)
+  const recordAttempt = useAppStore((state) => state.createQuizAttemptRemote)
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<number[]>([])
   const [showResults, setShowResults] = useState(false)
@@ -40,6 +41,8 @@ export function QuizPlayer({ quiz, onComplete }: QuizPlayerProps) {
       }
 
       addQuizResult(result)
+      // Persist attempt remotely (best-effort)
+      recordAttempt(quiz.id, { answers, score }).catch(() => {/* ignore */})
       setShowResults(true)
     }
   }
@@ -115,7 +118,7 @@ export function QuizPlayer({ quiz, onComplete }: QuizPlayerProps) {
           </div>
           <div className="w-full bg-slate-700 rounded-full h-2">
             <div
-              className="bg-gradient-to-r from-indigo-500 to-indigo-400 h-2 rounded-full transition-all"
+              className="bg-linear-to-r from-indigo-500 to-indigo-400 h-2 rounded-full transition-all"
               style={{
                 width: `${((currentQuestion + 1) / quiz.questions.length) * 100}%`,
               }}

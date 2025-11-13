@@ -25,8 +25,10 @@ export default function AIChatPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [generatingFlashcards, setGeneratingFlashcards] = useState(false)
   const [generatingNotes, setGeneratingNotes] = useState(false)
+  const [generatingQuiz, setGeneratingQuiz] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const generateQuizRemote = useAppStore((state) => state.generateQuizRemote)
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -133,18 +135,10 @@ export default function AIChatPage() {
     }
   }, [previewUrl])
 
-  const handleAddSummaryToNotes = (content: string) => {
+  const handleAddSummaryToNotes = async (content: string) => {
     if (!user) return
     const title = content.split('\n')[0].slice(0, 60) || "AI Summary"
-    addNote({
-      id: Math.random().toString(36).substr(2, 9),
-      title,
-      content,
-      subject: "AI Summary",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      userId: user.id,
-    })
+    await addNote({ title, content, subject: "AI Summary" })
   }
 
   const handleGenerateFlashcards = async (content: string) => {
@@ -182,14 +176,10 @@ export default function AIChatPage() {
     setGeneratingNotes(true)
     try {
       const noteResult = await generateStudyNotesFromText({ sourceText: content, subject: 'AI Summary', style: 'detailed' })
-      addNote({
-        id: Math.random().toString(36).substr(2, 9),
+      await addNote({
         title: noteResult.title,
         content: noteResult.content,
         subject: noteResult.subject,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        userId: user?.id || 'anon',
       })
       addChatMessage({
         id: Math.random().toString(36).substr(2, 9),
@@ -211,9 +201,39 @@ export default function AIChatPage() {
     }
   }
 
+  const handleGenerateQuiz = async (content: string) => {
+    if (generatingQuiz) return
+    setGeneratingQuiz(true)
+    try {
+      const quizId = await generateQuizRemote({
+        sourceText: content,
+        subject: 'AI Summary',
+        count: 6,
+        title: 'Quiz from AI Summary',
+      })
+      addChatMessage({
+        id: Math.random().toString(36).substr(2, 9),
+        role: 'assistant',
+        timestamp: new Date(),
+        content: quizId ? 'Quiz generated and saved. Open the Quiz page to play it.' : 'Quiz generated. Check your quizzes list.',
+        kind: 'text',
+      })
+    } catch (e) {
+      addChatMessage({
+        id: Math.random().toString(36).substr(2, 9),
+        role: 'assistant',
+        timestamp: new Date(),
+        content: 'Failed to generate quiz.',
+        kind: 'text',
+      })
+    } finally {
+      setGeneratingQuiz(false)
+    }
+  }
+
   return (
     <ProtectedLayout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-screen flex flex-col">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 h-screen flex flex-col">
         <div className="mb-6">
           <div className="flex justify-between items-center">
             <div>
@@ -232,7 +252,8 @@ export default function AIChatPage() {
         </div>
 
         {/* Chat Messages */}
-        <div className="flex-1 bg-slate-800/50 border border-slate-700 rounded-lg p-6 overflow-y-auto mb-4 space-y-4">
+        <div className="flex-1 bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6 overflow-y-auto mb-4">
+          <div className="mx-auto w-full max-w-3xl space-y-4">
           {chatHistory.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
@@ -257,8 +278,10 @@ export default function AIChatPage() {
                   onAddToNotes={handleAddSummaryToNotes}
                   onGenerateFlashcards={handleGenerateFlashcards}
                   onGenerateNotes={handleGenerateNotes}
+                  onGenerateQuiz={handleGenerateQuiz}
                   generatingFlashcards={generatingFlashcards}
                   generatingNotes={generatingNotes}
+                  generatingQuiz={generatingQuiz}
                 />
               ))}
               {isLoading && (
@@ -281,11 +304,12 @@ export default function AIChatPage() {
               <div ref={messagesEndRef} />
             </>
           )}
+          </div>
         </div>
 
         {/* File Upload + Chat Input */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-4 flex-wrap">
+        <div className="space-y-3">
+          <div className="mx-auto w-full max-w-3xl flex items-center gap-3 flex-wrap">
             <input
               type="file"
               accept="application/pdf"
@@ -354,25 +378,75 @@ export default function AIChatPage() {
               </div>
             )}
           </div>
-          <form onSubmit={handleSendMessage} className="flex gap-3">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={isLoading}
-              placeholder="Ask me anything..."
-              className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
-            >
-              Send
-            </button>
-          </form>
+          <ChatInput
+            value={input}
+            setValue={setInput}
+            isLoading={isLoading}
+            onSubmit={handleSendMessage}
+          />
         </div>
       </div>
     </ProtectedLayout>
+  )
+}
+
+// --- Chat Input component (auto-grow textarea) ---
+function ChatInput({
+  value,
+  setValue,
+  isLoading,
+  onSubmit,
+}: {
+  value: string
+  setValue: React.Dispatch<React.SetStateAction<string>>
+  isLoading: boolean
+  onSubmit: (e: React.FormEvent) => void
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = '0px'
+    const scrollH = el.scrollHeight
+    el.style.height = Math.min(scrollH, 200) + 'px' // cap height ~6-7 lines
+  }, [value])
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      // submit via synthetic form event
+      const form = e.currentTarget.form
+      if (form) {
+        const evt = new Event('submit', { bubbles: true, cancelable: true })
+        form.dispatchEvent(evt)
+      }
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="mx-auto w-full max-w-3xl">
+      <div className="flex items-end gap-3 bg-slate-800/70 border border-slate-700 rounded-xl p-2">
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={isLoading}
+          placeholder="Ask me anything... (Shift+Enter for new line)"
+          rows={1}
+          className="flex-1 resize-none bg-transparent text-white placeholder-slate-400 focus:outline-none px-3 py-2 max-h-[200px]"
+        />
+        <button
+          type="submit"
+          disabled={isLoading || !value.trim()}
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+          aria-label="Send message"
+        >
+          Send
+        </button>
+      </div>
+      <p className="text-[11px] text-slate-500 mt-2 text-center">AI can make mistakes. Check important info.</p>
+    </form>
   )
 }

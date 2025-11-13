@@ -1,16 +1,59 @@
 "use client"
 
-import { useState } from "react"
 import { ProtectedLayout } from "@/components/protected-layout"
 import { QuizPlayer } from "@/components/quiz-player"
 import { useAppStore } from "@/store/useAppStore"
+import { useEffect, useState } from "react"
 
 export default function QuizPage() {
   const quizzes = useAppStore((state) => state.quizzes)
   const quizResults = useAppStore((state) => state.quizResults)
+  const loadQuizzes = useAppStore((state) => state.loadQuizzes)
+  const fetchQuizById = useAppStore((state) => state.fetchQuizById)
   const [activeQuizId, setActiveQuizId] = useState<string | null>(null)
+  const [activeQuiz, setActiveQuiz] = useState<any | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [quizLoading, setQuizLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const activeQuiz = quizzes.find((q) => q.id === activeQuizId)
+  // Initial load
+  useEffect(() => {
+    let mounted = true
+    const run = async () => {
+      try {
+        await loadQuizzes()
+      } catch (e: any) {
+        if (mounted) setError(e.message || 'Failed to load quizzes')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    run()
+    return () => { mounted = false }
+  }, [loadQuizzes])
+
+  // Load full quiz when activeQuizId changes
+  useEffect(() => {
+    if (!activeQuizId) {
+      setActiveQuiz(null)
+      return
+    }
+    let mounted = true
+    setQuizLoading(true)
+    fetchQuizById(activeQuizId)
+      .then((q) => { if (mounted) setActiveQuiz(q) })
+      .catch((e) => { if (mounted) setError(e.message || 'Failed to load quiz') })
+      .finally(() => { if (mounted) setQuizLoading(false) })
+    return () => { mounted = false }
+  }, [activeQuizId, fetchQuizById])
+
+  if (quizLoading && activeQuizId) {
+    return (
+      <ProtectedLayout>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center text-slate-300">Loading quiz...</div>
+      </ProtectedLayout>
+    )
+  }
 
   if (activeQuiz) {
     return (
@@ -27,6 +70,30 @@ export default function QuizPage() {
             <p className="text-slate-400">{activeQuiz.subject}</p>
           </div>
           <QuizPlayer quiz={activeQuiz} onComplete={() => setActiveQuizId(null)} />
+        </div>
+      </ProtectedLayout>
+    )
+  }
+
+  if (loading) {
+    return (
+      <ProtectedLayout>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
+          <p className="text-slate-400">Loading quizzes...</p>
+        </div>
+      </ProtectedLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <ProtectedLayout>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
+          <p className="text-red-400 mb-4">{error}</p>
+          <button
+            onClick={() => { setLoading(true); setError(null); loadQuizzes().catch(e => setError(e.message || 'Failed again')).finally(()=> setLoading(false)) }}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+          >Retry</button>
         </div>
       </ProtectedLayout>
     )

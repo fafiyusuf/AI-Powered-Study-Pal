@@ -1,5 +1,5 @@
 // Dashboard relies on real backend-loaded data. Quizzes default empty until API is implemented.
-import type { ChatMessage, Flashcard, Note, Quiz, QuizResult, User } from "@/types/index"
+import type { ChatMessage, Flashcard, Note, Quiz, QuizQuestion, QuizResult, User } from "@/types/index"
 import { create } from "zustand"
 import type { AppState } from "./types"
 
@@ -21,6 +21,13 @@ async function api<T = any>(path: string, options: RequestInit = {}): Promise<T>
       localStorage.removeItem('auth_token')
     }
     try { const j = await res.json(); message = j.message || message } catch {}
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.warn('API error', {
+        url: `${API_BASE}${path}`,
+        method: options.method || 'GET',
+        status: res.status,
+      })
+    }
     throw new Error(message)
   }
   try { return await res.json() as T } catch { return {} as T }
@@ -286,12 +293,112 @@ getNotesBySubject: (subject: string) => {
 
   // Quiz actions
   addQuiz: (quiz: Quiz) => {
-    set((state) => ({
-      quizzes: [...state.quizzes, quiz],
-    }))
+    set((state) => ({ quizzes: [...state.quizzes, quiz] }))
   },
 
   getQuizzes: () => get().quizzes,
+
+  // Remote quizzes
+  loadQuizzes: async () => {
+    try {
+      const res = await api<{ success: boolean; data: any[] }>(`/api/quizzes`)
+      const mapped: Quiz[] = (res.data || []).map((q: any) => {
+        const questionCount = q._count?.questions || 0
+        const placeholderQuestions: QuizQuestion[] = Array.from({ length: questionCount }).map((_, i) => ({
+          id: `${q.id}-q${i}`,
+          question: `Question ${i + 1}`,
+          options: [],
+          correctAnswer: 0,
+          explanation: "",
+        }))
+        return {
+          id: q.id,
+          title: q.title,
+          subject: (q.description?.toString().match(/Generated from (.*)/)?.[1] || 'General'),
+          questions: placeholderQuestions,
+          createdAt: new Date(q.createdAt),
+          userId: q.userId,
+        }
+      })
+      set({ quizzes: mapped })
+    } catch (e) {
+      console.warn('Failed to load quizzes', e)
+    }
+  },
+
+  fetchQuizById: async (id: string) => {
+    const res = await api<{ success: boolean; data: any }>(`/api/quizzes/${id}`)
+    const q = res.data
+    const toOptions = (answer: string): { options: string[]; correct: number } => {
+      const correct = answer?.toString() || 'Correct answer'
+      const options = [
+        correct,
+        'Not enough information',
+        'A different concept',
+        'None of the above',
+      ]
+      return { options, correct: 0 }
+    }
+    const questions: QuizQuestion[] = (q.questions || []).map((qq: any, idx: number) => {
+      const mc = toOptions(qq.answer)
+      return {
+        id: qq.id || `${q.id}-q${idx}`,
+        question: qq.question,
+        options: mc.options,
+        correctAnswer: mc.correct,
+        explanation: qq.answer,
+      }
+    })
+    const quiz: Quiz = {
+      id: q.id,
+      title: q.title,
+      subject: (q.description?.toString().match(/Generated from (.*)/)?.[1] || 'General'),
+      questions,
+      createdAt: new Date(q.createdAt),
+      userId: q.userId,
+    }
+    return quiz
+  },
+
+  createQuizRemote: async (payload: { title: string; description?: string; questions?: { question: string; answer: string }[] }) => {
+    const res = await api<{ success: boolean; data: any }>(`/api/quizzes`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    const q = res.data
+    // reflect in list by reloading summaries
+    await get().loadQuizzes()
+    return q.id as string
+  },
+
+  updateQuizRemote: async (id: string, payload: { title?: string; description?: string; questions?: { question: string; answer: string }[] }) => {
+    await api<{ success: boolean; data: any }>(`/api/quizzes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+    await get().loadQuizzes()
+  },
+
+  deleteQuizRemote: async (id: string) => {
+    await api(`/api/quizzes/${id}`, { method: 'DELETE' })
+    set((state) => ({ quizzes: state.quizzes.filter((q) => q.id !== id) }))
+  },
+
+  generateQuizRemote: async (payload: { sourceText: string; title?: string; subject?: string; count?: number }) => {
+    const res = await api<{ success: boolean; data: any }>(`/api/quizzes/generate`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    await get().loadQuizzes()
+    return res.data?.id as string
+  },
+
+  createQuizAttemptRemote: async (id: string, data: { answers: number[]; score: number }) => {
+    await api<{ success: boolean; data: any }>(`/api/quizzes/${id}/attempt`, {
+      method: 'POST',
+      body: JSON.stringify({ answers: data.answers, score: data.score }),
+    })
+  },
 
   addQuizResult: (result: QuizResult) => {
     set((state) => ({

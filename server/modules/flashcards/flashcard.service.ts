@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma";
 import { CustomError } from "../../utils/customError";
+import { generateFlashcardsLLM } from "../ai/ai.service";
 
 export interface CreateFlashcardInput {
 	question: string;
@@ -89,23 +90,37 @@ export const generateFlashcards = async (
 		throw new CustomError("sourceText is required", 400);
 	}
 
-	// Primitive heuristic generator (placeholder for LLM-backed generation)
-	const sentences = source
-		.replace(/\s+/g, " ")
-		.split(/[.!?]\s+/)
-		.map((s) => s.trim())
-		.filter(Boolean);
+	// Try LLM-backed generation first
+	let mapped: { question: string; answer: string; tags: string[] }[] = [];
+	try {
+		const aiCards = await generateFlashcardsLLM(source, subject, count);
+		mapped = (aiCards || []).map((c: any) => ({
+			question: String(c.front ?? c.question ?? "").trim() || "Generated question",
+			answer: String(c.back ?? c.answer ?? "").trim() || "",
+			tags: [String(c.subject || subject)],
+		})).filter(c => c.question && c.answer);
+	} catch (e) {
+		// eslint-disable-next-line no-console
+		console.warn('[flashcards.generate] LLM failed, falling back to heuristic:', (e as any)?.message || e);
+	}
 
-	const cards: { question: string; answer: string; tags: string[] }[] = [];
-	for (let i = 0; i < count; i++) {
-		const base = sentences[i % Math.max(1, sentences.length)] || source.slice(0, 140);
-		const question = `What is the key idea of: "${base.slice(0, 100)}"?`;
-		const answer = base.length > 0 ? base : "A core concept from the provided text.";
-		cards.push({ question, answer, tags: [subject] });
+	// Fallback: primitive heuristic if LLM returned nothing
+	if (!mapped.length) {
+		const sentences = source
+			.replace(/\s+/g, " ")
+			.split(/[.!?]\s+/)
+			.map((s) => s.trim())
+			.filter(Boolean);
+		for (let i = 0; i < count; i++) {
+			const base = sentences[i % Math.max(1, sentences.length)] || source.slice(0, 140);
+			const question = `What is the key idea of: "${base.slice(0, 100)}"?`;
+			const answer = base.length > 0 ? base : "A core concept from the provided text.";
+			mapped.push({ question, answer, tags: [subject] });
+		}
 	}
 
 	const created = await prisma.$transaction(
-		cards.map((c) =>
+		mapped.map((c) =>
 			prisma.flashcard.create({
 				data: { userId, question: c.question, answer: c.answer, tags: c.tags },
 			})

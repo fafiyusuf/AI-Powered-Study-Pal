@@ -7,21 +7,22 @@ interface ModalProps {
   onClose: () => void
   title: string
   children: ReactNode
+  maxWidthClass?: string
 }
 
-export function Modal({ isOpen, onClose, title, children }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, maxWidthClass }: ModalProps) {
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-800 rounded-lg max-w-md w-full border border-slate-700">
-        <div className="flex justify-between items-center p-6 border-b border-slate-700">
+      <div className={`bg-slate-800 rounded-lg ${maxWidthClass ?? 'max-w-md'} w-full border border-slate-700 flex flex-col max-h-[85vh]`}>
+        <div className="flex justify-between items-center p-6 border-b border-slate-700 flex-none">
           <h2 className="text-lg font-semibold text-white">{title}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
             ✕
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   )

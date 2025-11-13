@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { ProtectedLayout } from "@/components/protected-layout"
 import { CreateNoteModal } from "@/components/create-note-modal"
+import { NotePreviewModal } from "@/components/note-preview-modal"
+import { ProtectedLayout } from "@/components/protected-layout"
 import { useAppStore } from "@/store/useAppStore"
+import type { Note } from "@/types"
+import { useEffect, useState } from "react"
 
 export default function NotesPage() {
   // Zustand state & actions
@@ -13,6 +15,8 @@ export default function NotesPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewNote, setPreviewNote] = useState<Note | null>(null)
 
   // Load notes on mount
   useEffect(() => {
@@ -27,6 +31,11 @@ export default function NotesPage() {
     if (confirm("Delete this note?")) {
       deleteNote(id)
     }
+  }
+
+  const openPreview = (note: Note) => {
+    setPreviewNote(note)
+    setPreviewOpen(true)
   }
 
   return (
@@ -78,7 +87,8 @@ export default function NotesPage() {
             {filteredNotes.map((note) => (
               <div
                 key={note.id}
-                className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 hover:border-indigo-500/50 transition-colors group"
+                className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 hover:border-indigo-500/50 transition-colors group cursor-pointer"
+                onClick={() => openPreview(note)}
               >
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
@@ -86,7 +96,7 @@ export default function NotesPage() {
                     <p className="text-sm text-indigo-400">{note.subject}</p>
                   </div>
                   <button
-                    onClick={() => handleDelete(note.id)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(note.id) }}
                     className="text-slate-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                   >
                     🗑️
@@ -112,6 +122,13 @@ export default function NotesPage() {
 
       {/* Create Note Modal */}
       <CreateNoteModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+
+      {/* Preview Note Modal */}
+      <NotePreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        note={previewNote}
+      />
     </ProtectedLayout>
   )
 }

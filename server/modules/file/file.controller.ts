@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from "express";
-import { saveStudyFile } from "./file.service";
+import { NextFunction, Request, Response } from "express";
 import { CustomError } from "../../utils/customError";
-import { genController } from "../ai/ai.service"
+import { genController } from "../ai/ai.service";
+import { saveStudyFile } from "./file.service";
 
 export const uploadStudyFile = async (req: Request, res: Response, next: NextFunction) => {
   try {

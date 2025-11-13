@@ -22,9 +22,9 @@ export interface AppState extends AuthState, StudyState {
   hydrateAuthFromStorage: () => Promise<void>
 
   // Note actions
-  addNote: (note: Note) => void
-  updateNote: (id: string, note: Partial<Note>) => void
-  deleteNote: (id: string) => void
+  addNote: (input: { title: string; content: string; subject: string }) => Promise<void>
+  updateNote: (id: string, note: Partial<Note>) => Promise<void>
+  deleteNote: (id: string) => Promise<void>
   getNotesBySubject: (subject: string) => Note[]
   loadNotes: () => Promise<void> // <-- add this
 
@@ -40,6 +40,13 @@ export interface AppState extends AuthState, StudyState {
   // Quiz actions
   addQuiz: (quiz: Quiz) => void
   getQuizzes: () => Quiz[]
+  loadQuizzes: () => Promise<void>
+  fetchQuizById: (id: string) => Promise<Quiz>
+  createQuizRemote: (payload: { title: string; description?: string; questions?: { question: string; answer: string }[] }) => Promise<string>
+  updateQuizRemote: (id: string, payload: { title?: string; description?: string; questions?: { question: string; answer: string }[] }) => Promise<void>
+  deleteQuizRemote: (id: string) => Promise<void>
+  generateQuizRemote: (payload: { sourceText: string; title?: string; subject?: string; count?: number }) => Promise<string>
+  createQuizAttemptRemote: (id: string, data: { answers: number[]; score: number }) => Promise<void>
   addQuizResult: (result: QuizResult) => void
   getQuizResults: () => QuizResult[]
 

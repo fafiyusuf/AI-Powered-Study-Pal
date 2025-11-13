@@ -197,6 +197,24 @@ export async function explainFromText(sourceText: string, question?: string): Pr
   return data.explanation || ''
 }
 
+// Generate quiz questions via backend AI
+export async function generateQuizFromText(input: { sourceText: string; subject?: string; count?: number; title?: string }): Promise<{ id?: string; questions?: { question: string; answer: string }[] }> {
+  try {
+    const res = await fetch(joinUrl(API_BASE, '/api/ai/generate-quiz'), {
+      method: 'POST',
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(input),
+    })
+    if (!res.ok) throw new Error(`Quiz generation failed ${res.status}`)
+    const data = await res.json().catch(() => ({})) as { quiz?: { id?: string; questions?: { question: string; answer: string }[] } }
+    if (data.quiz) return data.quiz
+    return { questions: [] }
+  } catch (e) {
+    console.warn('Quiz generation API unavailable, returning empty quiz.', e)
+    return { questions: [] }
+  }
+}
+
 function fallbackNote(input: GeneratedNoteInput): GeneratedNoteResult {
   const subject = input.subject || 'AI Generated'
   const style = input.style || 'outline'

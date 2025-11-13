@@ -2,10 +2,9 @@
 
 import type React from "react"
 
+import { useAppStore } from "@/store/useAppStore"
 import { useState } from "react"
 import { Modal } from "./modal"
-import { useAppStore } from "@/store/useAppStore"
-import type { Note } from "@/types/index"
 
 interface CreateNoteModalProps {
   isOpen: boolean
@@ -24,23 +23,17 @@ export function CreateNoteModal({ isOpen, onClose }: CreateNoteModalProps) {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.title.trim() || !formData.content.trim() || !user) return
-
-    const newNote: Note = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: formData.title,
-      content: formData.content,
-      subject: formData.subject,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      userId: user.id,
+    try {
+      await addNote({ title: formData.title, content: formData.content, subject: formData.subject })
+      setFormData({ title: "", content: "", subject: "React" })
+      onClose()
+    } catch (err) {
+      // Optionally surface toasts here
+      console.error("Failed to create note", err)
     }
-
-    addNote(newNote)
-    setFormData({ title: "", content: "", subject: "React" })
-    onClose()
   }
 
   return (
