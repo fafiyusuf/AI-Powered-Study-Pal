@@ -52,7 +52,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   login: async (email: string, password: string) => {
     set({ isLoading: true })
     try {
-      const data = await api<{ success: boolean; data: { user: any; token: string } }>(`/api/auth/login`, {
+      const data = await api<{ success: boolean; data: { user: any; token: string; refreshToken?: string } }>(`/api/auth/login`, {
         method: 'POST',
         body: JSON.stringify({ email, password })
       })
@@ -64,6 +64,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         avatar: payload.user.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${payload.user.name}`
       }
       localStorage.setItem('auth_token', payload.token)
+      if (payload.refreshToken) localStorage.setItem('refresh_token', payload.refreshToken)
       set({ user, isLoggedIn: true, isLoading: false })
     } catch (e: any) {
       set({ isLoading: false })
@@ -74,15 +75,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   signup: async (email: string, name: string, password: string) => {
     set({ isLoading: true })
     try {
-      const data = await api<{ success: boolean; user: any; token?: string }>(`/api/auth/register`, {
+      const data = await api<{ success: boolean; data: { user: any; token?: string; refreshToken?: string } }>(`/api/auth/register`, {
         method: 'POST',
         body: JSON.stringify({ email, name, password })
       })
-      // Controller returns { success, message, user }, but service returns { user, token }.
-      // So token is actually under data.user.token and actual user at data.user.user
-      const wrapper = (data as any).user || {}
-      const actualUser = wrapper.user || (data as any).user || {}
-      const token = (data as any).token || wrapper.token
+      const payload = (data as any).data || {}
+      const actualUser = payload.user || {}
+      const token = payload.token
+      const refresh = payload.refreshToken
       const user: User = {
         id: actualUser.id,
         email: actualUser.email || email,
@@ -90,6 +90,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         avatar: actualUser.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${actualUser.name || name}`,
       }
       if (token) localStorage.setItem('auth_token', token)
+      if (refresh) localStorage.setItem('refresh_token', refresh)
       set({ user, isLoggedIn: true, isLoading: false })
     } catch (e: any) {
       set({ isLoading: false })
@@ -100,11 +101,44 @@ export const useAppStore = create<AppState>((set, get) => ({
   logout: () => {
     set({ user: null, isLoggedIn: false, chatHistory: [] })
     localStorage.removeItem("auth_token")
+    localStorage.removeItem("refresh_token")
   },
   hydrateAuthFromStorage: async () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+    if (typeof window === 'undefined') return
+    const token = localStorage.getItem('auth_token')
     if (token && !get().isLoggedIn) {
       set({ isLoggedIn: true })
+      return
+    }
+    const refresh = localStorage.getItem('refresh_token')
+    if (refresh && !get().isLoggedIn) {
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: refresh })
+        })
+        if (!res.ok) throw new Error('Refresh failed')
+  const data = await res.json().catch(() => ({})) as any
+  const payload: any = data.data || {}
+  if (payload.token) localStorage.setItem('auth_token', payload.token)
+  if (payload.refreshToken) localStorage.setItem('refresh_token', payload.refreshToken)
+  const u = payload.user
+        if (u) {
+          const user: User = {
+            id: u.id,
+            email: u.email,
+            name: u.name,
+            avatar: u.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`
+          }
+          set({ user, isLoggedIn: true })
+        } else {
+          set({ isLoggedIn: true })
+        }
+      } catch {
+        // if refresh fails, clean up
+        localStorage.removeItem('refresh_token')
+      }
     }
   },
 

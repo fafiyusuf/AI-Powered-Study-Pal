@@ -1,16 +1,16 @@
 import { Request, Response, NextFunction } from "express";
-import { registerService, loginService } from "./auth.service";
+import { registerService, loginService, refreshTokenService } from "./auth.service";
 
 export const registerUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, email, password } = req.body;
 
-    const user = await registerService(name, email, password);
+    const data = await registerService(name, email, password);
 
     res.status(201).json({
       success: true,
       message: "User registered successfully",
-      user,
+      data,
     });
 
   } catch (err) {
@@ -30,6 +30,16 @@ export const loginUser = async (req: Request, res: Response, next: NextFunction)
       data,
     });
 
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const refreshTokenHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refreshToken } = req.body as { refreshToken: string };
+    const data = await refreshTokenService(refreshToken);
+    res.json({ success: true, message: "Token refreshed", data });
   } catch (err) {
     next(err);
   }

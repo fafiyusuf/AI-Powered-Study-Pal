@@ -9,24 +9,43 @@ export function ProtectedLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
   const isLoggedIn = useAppStore((state) => state.isLoggedIn)
   const hydrate = useAppStore((state) => state.hydrateAuthFromStorage)
-  const [isMounted, setIsMounted] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
 
+  // Run auth hydration once on mount
   useEffect(() => {
-    hydrate()
-    setIsMounted(true)
+    let cancelled = false
+
+    const run = async () => {
+      await hydrate()
+      if (!cancelled) {
+        setHydrated(true)
+      }
+    }
+
+    void run()
+
+    return () => {
+      cancelled = true
+    }
+  }, [hydrate])
+
+  // After hydration completes, decide whether to redirect
+  useEffect(() => {
+    if (!hydrated) return
     if (!isLoggedIn) {
       router.push("/login")
     }
-  }, [isLoggedIn, router, hydrate])
+  }, [hydrated, isLoggedIn, router])
 
-  if (!isMounted || !isLoggedIn) {
+  // While hydrating, or if we're about to redirect, don't render the app shell
+  if (!hydrated || !isLoggedIn) {
     return null
   }
 
   return (
     <>
       <Navigation />
-      <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">{children}</main>
+      <main className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900">{children}</main>
     </>
   )
 }
