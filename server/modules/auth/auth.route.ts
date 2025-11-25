@@ -1,7 +1,5 @@
 import express from "express";
-import { registerUser, loginUser, refreshTokenHandler } from "./auth.controller";
-import { protect } from "./auth.middleware";
-import { Request, Response } from "express";
+import { loginUser, refreshTokenHandler, registerUser } from "./auth.controller";
 
 const router = express.Router();
 

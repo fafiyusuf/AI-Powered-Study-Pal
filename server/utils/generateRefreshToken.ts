@@ -1,4 +1,4 @@
-import jwt, { type SignOptions, type Secret } from "jsonwebtoken";
+import jwt, { type Secret, type SignOptions } from "jsonwebtoken";
 
 interface RefreshPayload {
   id: string;

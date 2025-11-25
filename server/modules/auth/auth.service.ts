@@ -1,9 +1,9 @@
-import { prisma } from "../../lib/prisma";
-import { passwordUtils } from "../../utils/passwordUtils";
-import { CustomError } from "../../utils/customError";
-import { generateToken } from "../../utils/generateToken";
-import { generateRefreshToken } from "../../utils/generateRefreshToken";
 import jwt from "jsonwebtoken";
+import { prisma } from "../../lib/prisma";
+import { CustomError } from "../../utils/customError";
+import { generateRefreshToken } from "../../utils/generateRefreshToken";
+import { generateToken } from "../../utils/generateToken";
+import { passwordUtils } from "../../utils/passwordUtils";
 
 export const registerService = async (name: string, email: string, password: string) => {
   const existing = await prisma.user.findUnique({ where: { email } });
